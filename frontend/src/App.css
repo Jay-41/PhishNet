@@ -1,0 +1,101 @@
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2rem;
+  text-align: left;
+}
+
+.header h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.subtitle {
+  margin: 0 0 1.25rem;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  font: inherit;
+  line-height: 1.4;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 200px;
+}
+
+.textarea:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-color: #2563eb;
+}
+
+.analyze-btn {
+  align-self: flex-start;
+  padding: 0.5rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.analyze-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.analyze-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.results {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.results h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.risk {
+  margin: 0 0 1rem;
+}
+
+.flags {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.placeholder {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.95rem;
+}
