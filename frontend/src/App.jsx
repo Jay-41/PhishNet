@@ -42,7 +42,7 @@ export default function App() {
       <header className="header">
         <h1>Phishing Email Analyzer</h1>
         <p className="subtitle">
-          Paste an email below and run a quick risk check (mock results for now).
+          Paste an email below for a quick heuristic risk check.
         </p>
       </header>
 

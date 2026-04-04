@@ -1,6 +1,6 @@
 # Phishing Email Content Analyzer
 
-Full-stack web app: **React (Vite)** frontend and **Flask** backend. Paste email text, call `/analyze`, and view a risk score plus flagged issues (mock data for now).
+Full-stack web app: **React (Vite)** frontend and **Flask** backend. Paste email text, call `/analyze`, and view a risk score plus flags from simple heuristics (links, urgency wording, sensitive requests, etc.).
 
 ## Project layout
 
@@ -41,12 +41,12 @@ The API listens on **http://127.0.0.1:5000**. The `POST /analyze` endpoint expec
 { "email": "paste email text here" }
 ```
 
-Example mock response:
+Example response (values depend on content):
 
 ```json
 {
-  "risk_score": 75,
-  "flags": ["Suspicious link", "Urgent language"]
+  "risk_score": 58,
+  "flags": ["Contains HTTP/HTTPS links", "Urgent or high-pressure language"]
 }
 ```
 
