@@ -281,69 +281,81 @@ def analyze_email(text: str) -> tuple[int, list[str]]:
     lower = text.lower()
     flags: list[str] = []
     score = 0
-    serious_signals = 0  # track high-confidence indicators for compounding
+    serious_signals = 0
 
-    # --- URL analysis ---
-    urls = _URL_RE.findall(text)
+    urls = _extract_urls(text)
+    lowered_urls = [u.lower() for u in urls]
+    has_raw_ip = False
+
     if urls:
         flags.append("Contains HTTP/HTTPS links")
-        score += 10 + min(5 * (len(urls) - 1), 15)  # 10–25 pts, scales with count
+        score += min(10 + 5 * (len(urls) - 1), 25)
 
-        for u in urls:
-            ul = u.lower()
-            if _IP_IN_URL.search(ul):
-                flags.append("Link targets a raw IP address")
-                score += 30  # raw IP is a very strong signal
-                serious_signals += 1
-                break
+        has_raw_ip = any(_IP_IN_URL.search(u) for u in lowered_urls)
+        if has_raw_ip:
+            flags.append("Link targets a raw IP address")
+            score += 30
+            serious_signals += 1
 
-        lowered = [u.lower() for u in urls]
-        if any(short in u for u in lowered for short in _SHORTENERS):
+        if any(short in u for u in lowered_urls for short in _SHORTENERS):
             flags.append("URL shortener present")
             score += 20
             serious_signals += 1
 
-    # --- Urgency / pressure language ---
+        for u in urls:
+            if _url_has_credential_trick(u):
+                flags.append("URL uses misleading login or @-style trick")
+                score += 18
+                break
+        if any(_suspicious_url_path(u) for u in urls):
+            flags.append("Link path looks like a login or verify page")
+            score += 14
+
     urgent_hits = [p for p in _URGENT if p in lower]
     if urgent_hits:
         flags.append("Urgent or high-pressure language")
-        # Each hit adds more weight, uncapped up to 35
-        score += min(10 + 5 * len(urgent_hits), 35)
-        if len(urgent_hits) >= 2:
+        n_u = len(urgent_hits)
+        score += min(10 + 5 * (n_u - 1), 35)
+        if n_u >= 2:
             serious_signals += 1
 
-    # --- Sensitive info requests ---
     sensitive_hits = [p for p in _SENSITIVE if p in lower]
     if sensitive_hits:
         flags.append("Asks for sensitive or financial information")
-        score += 20 + min(5 * (len(sensitive_hits) - 1), 15)  # 20–35 pts
+        n_s = len(sensitive_hits)
+        score += min(20 + 5 * (n_s - 1), 35)
         serious_signals += 1
 
-    # --- Generic greetings ---
-    if "dear customer" in lower or "dear user" in lower or "dear valued" in lower:
-        flags.append("Generic greeting")
-        score += 12
+    if has_raw_ip and sensitive_hits:
+        flags.append("Raw IP link combined with requests for sensitive information")
+        score += 10
 
-    # --- Prize / lottery scam ---
+    if any(g in lower for g in _GENERIC_GREETING):
+        flags.append("Generic greeting")
+        score += 22
+
+    prize_scam = False
     if "prize" in lower and ("won" in lower or "winner" in lower):
         flags.append("Prize or lottery-style pitch")
         score += 22
+        prize_scam = True
+    elif any(h in lower for h in _SCAM_HOOKS):
+        flags.append("Common scam or prize/inheritance pitch")
+        score += 22
+        prize_scam = True
+    if prize_scam:
         serious_signals += 1
 
-    # --- Risky attachments ---
     if "attachment" in lower and any(
-        ext in lower for ext in (".exe", ".zip", ".scr", ".bat")
+        ext in lower for ext in (".exe", ".zip", ".scr", ".bat", ".js", ".vbs")
     ):
         flags.append("References risky attachment types")
         score += 25
         serious_signals += 1
 
-    # --- Compounding multiplier for multiple serious signals ---
-    # Each serious signal beyond the first amplifies the total score
     if serious_signals >= 2:
         score = int(score * (1.0 + 0.15 * (serious_signals - 1)))
 
-    # --- De-dupe flags, preserve order ---
     seen: set[str] = set()
     unique = [f for f in flags if not (f in seen or seen.add(f))]
     if not unique:
