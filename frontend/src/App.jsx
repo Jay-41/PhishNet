@@ -5,8 +5,10 @@ const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export default function App() {
   const [emailText, setEmailText] = useState('')
-  const [riskScore, setRiskScore] = useState(null)
-  const [flags, setFlags] = useState([])
+  const [prediction, setPrediction] = useState(null)
+  const [confidence, setConfidence] = useState(null)
+  const [label, setLabel] = useState(null)
+  const [modelName, setModelName] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -14,23 +16,29 @@ export default function App() {
     setError(null)
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/analyze`, {
+      const res = await fetch(`${API_URL}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailText }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setRiskScore(null)
-        setFlags([])
-        setError(data.error || `Request failed (${res.status})`)
+        setPrediction(null)
+        setConfidence(null)
+        setLabel(null)
+        setModelName(null)
+        setError(data.error || data.hint || `Request failed (${res.status})`)
         return
       }
-      setRiskScore(data.risk_score)
-      setFlags(Array.isArray(data.flags) ? data.flags : [])
+      setPrediction(data.prediction)
+      setConfidence(data.confidence)
+      setLabel(data.label ?? null)
+      setModelName(data.model ?? null)
     } catch (e) {
-      setRiskScore(null)
-      setFlags([])
+      setPrediction(null)
+      setConfidence(null)
+      setLabel(null)
+      setModelName(null)
       setError(e.message || 'Could not reach the server.')
     } finally {
       setLoading(false)
@@ -42,7 +50,8 @@ export default function App() {
       <header className="header">
         <h1>Phishing Email Analyzer</h1>
         <p className="subtitle">
-          Paste an email below for a quick heuristic risk check.
+          Paste an email below. The backend uses a trained ML model (TF-IDF + classifier) on
+          the CEAS dataset.
         </p>
       </header>
 
@@ -72,27 +81,25 @@ export default function App() {
         <section className="results" aria-live="polite">
           <h2>Results</h2>
           {error && <p className="error">{error}</p>}
-          {!error && riskScore === null && !loading && (
-            <p className="placeholder">Run an analysis to see the risk score and flags.</p>
+          {!error && prediction === null && !loading && (
+            <p className="placeholder">
+              Run an analysis to see the model prediction and confidence.
+            </p>
           )}
           {loading && <p className="placeholder">Waiting for response…</p>}
-          {!error && riskScore !== null && !loading && (
+          {!error && prediction !== null && !loading && (
             <>
               <p className="risk">
-                <strong>Risk score:</strong> {riskScore}
+                <strong>Prediction:</strong> {prediction} ({label ?? '—'})
               </p>
-              <div>
-                <strong>Flagged issues</strong>
-                {flags.length === 0 ? (
-                  <p className="placeholder">None reported.</p>
-                ) : (
-                  <ul className="flags">
-                    {flags.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <p className="risk">
+                <strong>Confidence:</strong> {confidence != null ? `${(confidence * 100).toFixed(2)}%` : '—'}
+              </p>
+              {modelName && (
+                <p className="placeholder">
+                  <strong>Model:</strong> {modelName}
+                </p>
+              )}
             </>
           )}
         </section>

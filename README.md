@@ -1,18 +1,24 @@
 # Phishing Email Content Analyzer
 
-Full-stack web app: **React (Vite)** frontend and **Flask** backend. Paste email text, call `/analyze`, and view a risk score plus flags from simple heuristics (links, urgency wording, sensitive requests, etc.).
+Full-stack app: **React (Vite)** frontend and **Flask** backend. The backend classifies pasted email text with **scikit-learn** (TF-IDF features + trained classifier) using the **CEAS_08** dataset (`frontend/public/CEAS_08.csv`).
 
 ## Project layout
 
 - `frontend/` — Vite + React UI
-- `backend/` — Flask API
+- `backend/` — Flask API, training script, and ML package
+  - `phishing_ml/` — data loading, preprocessing, training
+  - `train_model.py` — train models, evaluate, save `models/phishing_model.pkl`
+  - `app.py` — loads the saved model and serves `POST /predict`
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (LTS recommended)
 - [Python](https://www.python.org/) 3.10+ with `pip`
+- Enough RAM/disk to read the CEAS CSV (large file; training uses a stratified subsample by default)
 
-## Backend setup
+## Train the model (required before first API run)
+
+From the `backend/` directory, install dependencies and run training:
 
 ```bash
 cd backend
@@ -24,7 +30,7 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python app.py
+python train_model.py
 ```
 
 **macOS / Linux:**
@@ -32,27 +38,43 @@ python app.py
 ```bash
 source .venv/bin/activate
 pip install -r requirements.txt
+python train_model.py
+```
+
+Training loads `CEAS_08.csv`, builds `text` from **subject + body** (cleaned), compares **Logistic Regression**, **Multinomial Naive Bayes**, and **Random Forest** (TF-IDF → truncated SVD → forest), prints accuracy / precision / recall / F1, and saves the **best F1** pipeline to `backend/models/phishing_model.pkl`.
+
+### Tuning large datasets
+
+| Environment variable | Meaning |
+|---------------------|--------|
+| `CEAS_MAX_SAMPLES` | Max rows after load (stratified subsample); default `150000` |
+| `CEAS_NROWS` | Read only first N rows from the CSV (optional speed/debug) |
+| `TFIDF_MAX_FEATURES` | TF-IDF vocabulary cap; default `25000` |
+
+CLI shortcuts:
+
+```bash
+python train_model.py --nrows 50000 --max-samples 20000
+```
+
+## Run the API
+
+With the virtualenv activated:
+
+```bash
 python app.py
 ```
 
-The API listens on **http://127.0.0.1:5000**. The `POST /analyze` endpoint expects JSON:
+The API listens on **http://127.0.0.1:5000**. It **does not** retrain on startup; it loads `models/phishing_model.pkl`. If the file is missing, `POST /predict` returns **503** with a hint to run `train_model.py`.
 
-```json
-{ "email": "paste email text here" }
-```
+### Endpoints
 
-Example response (values depend on content):
-
-```json
-{
-  "risk_score": 58,
-  "flags": ["Contains HTTP/HTTPS links", "Urgent or high-pressure language"]
-}
-```
+- `POST /predict` — JSON `{"email": "<text>"}` → `prediction` (0 or 1), `confidence`, `label` (`legitimate` / `phishing`), `model`
+- `GET /health` — `model_loaded` status
 
 ## Frontend setup
 
-In a **second** terminal:
+In a second terminal:
 
 ```bash
 cd frontend
@@ -60,20 +82,21 @@ npm install
 npm run dev
 ```
 
-Open the URL shown in the terminal (usually **http://localhost:5173**). The Vite dev server proxies `/analyze` to the Flask app, so keep the backend running while you use the UI.
+Open the URL shown (e.g. **http://localhost:5173**). The dev server proxies `/predict` to Flask.
 
 ### Optional: direct API URL
 
-To call the backend without the proxy (e.g. custom ports), create `frontend/.env`:
+Create `frontend/.env`:
 
 ```env
 VITE_API_URL=http://127.0.0.1:5000
 ```
 
-The app will then use `fetch` to `${VITE_API_URL}/analyze`.
+The UI calls `${VITE_API_URL}/predict`.
 
 ## Run both locally
 
-1. Start Flask: `python app.py` from `backend/` (port 5000).
-2. Start Vite: `npm run dev` from `frontend/` (port 5173).
-3. Use the browser UI to paste email content and click **Analyze**.
+1. Train once: `python train_model.py` from `backend/`.
+2. Start Flask: `python app.py` (port 5000).
+3. Start Vite: `npm run dev` from `frontend/`.
+4. Paste email text and click **Analyze**.
